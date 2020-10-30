@@ -1,0 +1,156 @@
+{% extends 'buyshoes/base.html' %}
+
+{% block content %}
+{% if result %}
+	<div class="col-lg-12">
+		<h3>PURCHASE DONE CORRECTLY!</h3>
+	</div>
+{% endif %}
+<form action="{% url 'buyshoes:purchase' %}" id="id-purchaseForm" method="POST">
+    {% csrf_token %}
+	<!-- Lista elementos -->
+	<main id="items" class="col-sm-8 row">
+		{% for shoe in shoes %}
+			<div class="card col-sm-4">
+				<div class="card-body">
+					<img class="img-fluid" src="" alt="imagen">
+					<h5 class="card-title">{{ shoe.name }}</h5>
+					<p class="card-text">{{ shoe.price }}€</p>
+					<input type='button' value="+" class="btn btn-primary" onclick="anyadirCarrito({{ shoe.pk}})">
+				</div>
+			</div>
+		{% endfor %}
+	</main>
+</form>
+	<!-- Carrito -->
+	<aside class="col-sm-4">
+		<h2>Carry</h2>
+		<!-- Elementos carrito -->
+		<ul id="carry" class="list-group"></ul>
+		<!--<p id="carry">0 ítems seleccionados</p>-->
+		<hr>
+		<!-- Precio total -->
+		<p class="text-right">Total: <span id="total">0</span>&euro;</p>
+		<button id="boton-vaciar" class="btn btn-danger" onclick="vaciarCarrito()">Vaciar</button>
+		<button id="purchase-button" class="btn btn-success align-items-right" disabled onclick="purchase()">Buy Now</button>
+	</aside>
+
+<script>
+let data_from_django = {{json|safe}};
+/*let ruben = data_from_django.filter(function(itemRuben){
+	return itemRuben['pk'] == 2;
+});*/
+let carrito = [];
+let total = 0;
+let $carrito = document.querySelector('#carry');
+let $total = document.querySelector('#total');
+let $botonVaciar = document.querySelector('#boton-vaciar');
+
+function anyadirCarrito(pk){
+	carrito.push(pk)
+	calcularTotal();
+	renderizarCarrito(pk);
+}
+
+function calcularTotal(){
+	total = 0;
+	for (let item of carrito){
+		let miItem = data_from_django.filter(function(itemData){
+			return itemData['pk'] == item;
+		});
+		total = total + parseFloat(miItem[0]['fields'].price);
+	}
+	total = parseFloat(total);
+	$total.textContent = total.toFixed(2);
+}
+
+function renderizarCarrito(){
+	if(carrito.length > 0){
+		document.getElementById('purchase-button').disabled = false;
+	}
+	else{
+		document.getElementById('purchase-button').disabled = true;
+	}
+	//Vaciamos el HTML
+	$carrito.textContent = "";
+	//Quitamos los duplicaods
+	let carritoSinDuplicados = [...new Set(carrito)];
+	//Generamos los nodos a partir de carrito
+	carritoSinDuplicados.forEach(function (item,indice) {
+		//Obtenemos el ítem que necesitamos de la variable del json
+		let miItem = data_from_django.filter(function(itemNew){
+			return itemNew['pk'] == item;
+		});
+		//Cuenta el númoer de veces que se repite el producto
+		let numeroUnidadesItem = carrito.reduce(function (total, itemId){
+			return itemId === item ? total +=1 : total;
+		}, 0);
+		//Creamos el nodo del item del carrito
+		let miNodo = document.createElement('li');
+		miNodo.classList.add('list-group-item', 'text-right', 'mx-2');
+		miNodo.textContent = `${numeroUnidadesItem} x ${miItem[0]['fields'].name} - ${miItem[0]['fields'].price}€`;
+		//Botón borrar
+		let miBoton = document.createElement('button');
+		miBoton.classList.add('btn', 'btn-danger', 'mx-5');
+		miBoton.textContent = 'X';
+		miBoton.style.marginLeft = '1erm';
+		miBoton.setAttribute('item', item);
+		miBoton.addEventListener('click', borrarItemCarrito);
+		//Mezclamos nodos
+		miNodo.appendChild(miBoton);
+		$carrito.appendChild(miNodo);
+	});
+}
+
+function borrarItemCarrito(){
+	//Obtenemos el producto ID que hay en el botón pulsado
+	let id = this.getAttribute('item');
+	//Borramos todos los productos
+	carrito = carrito.filter(function(carritoId){
+		return parseInt(carritoId) !== parseInt(id);
+	});
+	//volvemos a renderizar
+	renderizarCarrito();
+	//Calculamos de nuevo el precio
+	calcularTotal();
+}
+
+function vaciarCarrito(){
+	carrito = [];
+	renderizarCarrito();
+	calcularTotal();
+}
+
+function purchase(){
+	let carritoSinDuplicados = [...new Set(carrito)];
+	//Generamos los nodos a partir de carrito
+	carritoSinDuplicados.forEach(function (item,indice) {
+		//Obtenemos el ítem que necesitamos de la variable del json
+		let miItem = data_from_django.filter(function(itemNew){
+			return itemNew['pk'] == item;
+		});
+		//Cuenta el númoer de veces que se repite el producto
+		let numeroUnidadesItem = carrito.reduce(function (total, itemId){
+			return itemId === item ? total +=1 : total;
+		}, 0);
+		//Add cart
+		jQuery.ajax({
+			url:'{% url "buyshoes:add_cart" %}',
+			data: {
+				'shoe_index': miItem[0]['pk'],
+				'shoe_amount': numeroUnidadesItem,
+			},
+			dataType: 'json',
+			success: function(data){
+				window.location ="{% url 'buyshoes:purchase' %}";
+				//console.log('ok');
+			},
+			error: function(data){
+				//console.log("error");
+			}
+		});
+	});
+}
+
+</script>
+{% endblock %}

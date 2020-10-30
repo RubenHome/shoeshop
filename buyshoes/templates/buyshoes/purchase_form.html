@@ -1,0 +1,23 @@
+{% extends 'buyshoes/base.html' %}
+
+{% block content %}
+<form method="POST" class="form-horizontal" action="{% url 'buyshoes:finish_purchase' %}">
+	<div class="col-lg-12">
+		Cart Contain:
+		<ul id="cart" class="list-group">
+			{% for key, value in shoes_list.items %}
+				<li>{{value}} {{key}}</li>
+			{% endfor %}
+		</ul>
+	</div>
+	<div class="col-lg-12">
+		Total: {{total}}
+	</div>
+	<div class="col-lg-12"><br></div>
+	{% csrf_token %}
+	{{form.as_p}}
+	<input id="total" type='hidden' value='{{total}}'>
+	<button type="submit" class="btn btn-primary">Finish Purchase</button>
+</form>
+
+{% endblock %}
